@@ -1,0 +1,19 @@
+{
+  "name": "golf",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A web version of Golf (aka Polish Golf / Polish Poker) — the card game where lowest score over 9 holes wins. Play locally against bots, or online against a friend via a shared room code (Firebase-synced).",
+  "workspaces": [
+    "packages/engine",
+    "packages/client"
+  ],
+  "scripts": {
+    "build:engine": "npm run build -w packages/engine",
+    "test": "npm run test -w packages/engine",
+    "dev": "npm run build:engine && npm run dev -w packages/client",
+    "build": "npm run build:engine && npm run build -w packages/client"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
