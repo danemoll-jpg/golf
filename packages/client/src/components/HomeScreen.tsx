@@ -16,7 +16,7 @@ export function HomeScreen({ onSelectLocal, onSelectOnline }: HomeScreenProps) {
         <div className="home-screen__choices">
           <button type="button" className="home-screen__choice" onClick={onSelectLocal}>
             <span className="home-screen__choice-emoji">🏌️</span>
-            <span className="home-screen__choice-title">Play locally vs. Ed &amp; Carol</span>
+            <span className="home-screen__choice-title">Play against AI</span>
             <span className="home-screen__choice-sub">Just you and this browser — no one else needed.</span>
           </button>
           <button type="button" className="home-screen__choice" onClick={onSelectOnline}>
