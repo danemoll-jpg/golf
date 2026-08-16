@@ -17,6 +17,7 @@ import { commentaryForEvents } from '../lib/commentary';
 import { isMuted, playSound, setMuted, SoundName } from '../lib/audio';
 import { addScoresToGlobalLeaderboard } from '../network/globalLeaderboard';
 import { getClientId } from '../network/clientId';
+import { clearSavedRoomCode, getSavedRoomCode, saveRoomCode } from '../network/roomSession';
 import {
   addBotSeat as addBotSeatRequest,
   addOpenSeat as addOpenSeatRequest,
@@ -90,7 +91,10 @@ export interface UseOnlineRoom {
  * cues, shared commentary. */
 export function useOnlineRoom(): UseOnlineRoom {
   const myClientId = useMemo(() => getClientId(), []);
-  const [code, setCode] = useState<string | null>(null);
+  // Starts from whatever room (if any) this browser was last connected to — see
+  // network/roomSession.ts — so a refresh (or reopening the tab later) resumes the same
+  // match instead of losing it.
+  const [code, setCode] = useState<string | null>(() => getSavedRoomCode());
   const [room, setRoom] = useState<RoomDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<MoveHint | null>(null);
@@ -106,7 +110,14 @@ export function useOnlineRoom(): UseOnlineRoom {
     if (!code) return undefined;
     const unsubscribe = subscribeToRoom(code, (next) => {
       setRoom(next);
-      setError(next ? null : 'That room no longer exists.');
+      if (next) {
+        setError(null);
+      } else {
+        // The room this browser remembered no longer exists (expired, deleted, or a stale/
+        // mistyped code) — stop trying to resume it on the next reload.
+        setError('That room no longer exists.');
+        clearSavedRoomCode();
+      }
     });
     return unsubscribe;
   }, [code]);
@@ -181,6 +192,7 @@ export function useOnlineRoom(): UseOnlineRoom {
     setError(null);
     try {
       const newCode = await createRoom(hostName, hostIcon);
+      saveRoomCode(newCode);
       setCode(newCode);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create a room.');
@@ -191,6 +203,7 @@ export function useOnlineRoom(): UseOnlineRoom {
     setError(null);
     try {
       const joined = await joinRoom(joinCode, name, icon);
+      saveRoomCode(joined);
       setCode(joined);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not join that room.');
@@ -198,6 +211,7 @@ export function useOnlineRoom(): UseOnlineRoom {
   }, []);
 
   const leaveRoom = useCallback(() => {
+    clearSavedRoomCode();
     setCode(null);
     setRoom(null);
     setError(null);

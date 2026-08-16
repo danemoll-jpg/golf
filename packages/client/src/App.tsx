@@ -6,11 +6,15 @@ import { OnlineHomeScreen } from './components/OnlineHomeScreen';
 import { StartScreen } from './components/StartScreen';
 import { useLocalGame } from './hooks/useLocalGame';
 import { useOnlineRoom } from './hooks/useOnlineRoom';
+import { getSavedRoomCode } from './network/roomSession';
 
 type Mode = 'home' | 'local' | 'online';
 
 export default function App() {
-  const [mode, setMode] = useState<Mode>('home');
+  // If this browser remembers being in an online room (see network/roomSession.ts), skip
+  // straight past the home screen — a refresh, or reopening the tab later, should resume
+  // the match, not strand you back at square one with no way to get back in.
+  const [mode, setMode] = useState<Mode>(() => (getSavedRoomCode() ? 'online' : 'home'));
 
   if (mode === 'home') {
     return <HomeScreen onSelectLocal={() => setMode('local')} onSelectOnline={() => setMode('online')} />;
