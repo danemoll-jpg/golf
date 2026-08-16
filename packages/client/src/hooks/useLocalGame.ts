@@ -187,11 +187,16 @@ export function useLocalGame(): UseLocalGame {
   useEffect(() => {
     if (!state || state.phase !== 'matchOver' || submittedLeaderboard.current) return;
     submittedLeaderboard.current = true;
-    const results = state.players.map((p) => ({
-      name: p.name,
-      score: p.holeScores.reduce((a, b) => a + b, 0),
-      isAi: p.isBot,
-    }));
+    // Bots don't compete for leaderboard spots — only human results get submitted, so the
+    // board reflects real players, not however well the heuristic bot strategy happens to play.
+    const results = state.players
+      .filter((p) => !p.isBot)
+      .map((p) => ({
+        name: p.name,
+        score: p.holeScores.reduce((a, b) => a + b, 0),
+        isAi: false,
+      }));
+    if (results.length === 0) return;
     addScoresToGlobalLeaderboard(results).catch(() => {
       // Leaderboard is a nice-to-have — a failed write (e.g. Firebase not configured yet)
       // shouldn't disrupt the game-over screen.

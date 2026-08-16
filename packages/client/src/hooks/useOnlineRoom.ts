@@ -162,11 +162,16 @@ export function useOnlineRoom(): UseOnlineRoom {
   useEffect(() => {
     if (!isHost || !gameState || gameState.phase !== 'matchOver' || submittedLeaderboard.current) return;
     submittedLeaderboard.current = true;
-    const results = gameState.players.map((p) => ({
-      name: p.name,
-      score: p.holeScores.reduce((a, b) => a + b, 0),
-      isAi: p.isBot,
-    }));
+    // Bots don't compete for leaderboard spots — only human results get submitted, so the
+    // board reflects real players, not however well the heuristic bot strategy happens to play.
+    const results = gameState.players
+      .filter((p) => !p.isBot)
+      .map((p) => ({
+        name: p.name,
+        score: p.holeScores.reduce((a, b) => a + b, 0),
+        isAi: false,
+      }));
+    if (results.length === 0) return;
     addScoresToGlobalLeaderboard(results).catch(() => {
       // Leaderboard is a nice-to-have — a failed write shouldn't disrupt the game-over screen.
     });
