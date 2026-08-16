@@ -712,6 +712,8 @@ button {
   padding: 0.5rem 0.8rem;
   box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.4);
   animation: toast-in 0.25s ease-out;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 @keyframes toast-in {

@@ -1,5 +1,5 @@
 import { BotPersonalityId, GameEvent, GameState, PlayerState } from '../types.js';
-import { CommentaryKey, PERSONALITIES } from './personalities.js';
+import { CommentaryKey, PERSONALITIES, Personality } from './personalities.js';
 import { CommentaryLine, CommentaryProvider } from './types.js';
 
 type BotPlayer = PlayerState & { personality: BotPersonalityId };
@@ -40,6 +40,17 @@ function resolveKey(base: BaseEvent, speakerId: string): CommentaryKey {
   return `${base.key}${isSelf ? 'Self' : 'Other'}` as CommentaryKey;
 }
 
+/** Picks which line pool to draw from: a personalized one if the player being addressed is
+ * someone the speaker has a special relationship with (their spouse, their kid, their
+ * granddaughter — see Personality.namedOverrides), otherwise their normal reaction lines. */
+function resolveLinePool(personality: Personality, key: CommentaryKey, addresseeName: string | undefined): string[] | undefined {
+  if (addresseeName) {
+    const override = personality.namedOverrides?.[addresseeName.trim().toLowerCase()]?.[key];
+    if (override && override.length > 0) return override;
+  }
+  return personality.lines[key];
+}
+
 function fillTemplate(template: string, event: GameEvent, state: GameState): string {
   const nameOf = (id: string) => state.players.find((p) => p.id === id)?.name ?? id;
   let text = template;
@@ -57,13 +68,15 @@ function fillTemplate(template: string, event: GameEvent, state: GameState): str
   return text;
 }
 
-/** Picks who speaks. Carol always gets first refusal on reacting to a great play — that
- * needling "ooh, look at YOU" reaction is her defining trait — and otherwise talks about
- * twice as often as the quieter Ed, matching their personalities. */
-function pickSpeaker(bots: BotPlayer[], baseKey: BaseKey): BotPlayer {
+/** Picks who speaks. Carol gets first refusal on reacting to someone ELSE's great play —
+ * that needling "ooh, look at YOU" reaction is her defining trait — but if SHE'S the one who
+ * made the play, she steps back so her husband sometimes gets the moment instead (Ed bragging
+ * about his wife is sweeter than Carol congratulating herself every time). Otherwise Carol
+ * talks about twice as often as the quieter Ed, matching their personalities. */
+function pickSpeaker(bots: BotPlayer[], baseKey: BaseKey, actorId: string | undefined): BotPlayer {
   if (baseKey === 'greatPlay') {
     const carol = bots.find((b) => b.personality === 'carol');
-    if (carol) return carol;
+    if (carol && carol.id !== actorId) return carol;
   }
   const weighted: BotPlayer[] = [];
   for (const b of bots) {
@@ -88,10 +101,12 @@ export class TemplateCommentaryProvider implements CommentaryProvider {
       (p): p is PlayerState & { personality: NonNullable<PlayerState['personality']> } => p.isBot && !!p.personality,
     );
     if (bots.length === 0) return [];
-    const speaker = pickSpeaker(bots, base.key);
+    const speaker = pickSpeaker(bots, base.key, base.actorId);
 
     const key = resolveKey(base, speaker.id);
-    const pool = PERSONALITIES[speaker.personality].lines[key];
+    const isSelf = base.actorId === speaker.id;
+    const addresseeName = !isSelf && base.actorId ? state.players.find((p) => p.id === base.actorId)?.name : undefined;
+    const pool = resolveLinePool(PERSONALITIES[speaker.personality], key, addresseeName);
     if (!pool || pool.length === 0) return [];
 
     const last = this.lastLineByPersonality.get(speaker.personality);
