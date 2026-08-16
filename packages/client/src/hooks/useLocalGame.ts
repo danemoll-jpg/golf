@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   applyAction,
+  BotDifficulty,
   createMatch,
   deriveSoundCues,
   GameEvent,
@@ -14,6 +15,7 @@ import {
 } from '@golf/engine';
 import { isBotTurn, stepBot } from '../lib/bot';
 import { commentaryForEvents } from '../lib/commentary';
+import { DEFAULT_DIFFICULTY } from '../lib/difficulty';
 import { BOT_DISPLAY_NAMES, buildPlayerConfigs, MAX_SEATS, nextBotPersonality, SeatConfig } from '../lib/players';
 import { isMuted, playSound, setMuted, SoundName } from '../lib/audio';
 import { DEFAULT_PLAYER_ICON } from '../lib/icons';
@@ -46,7 +48,7 @@ export interface UseLocalGame {
   error: string | null;
   muted: boolean;
   toggleMuted: () => void;
-  startMatch: (humanName: string, totalPlayers: number, icon: string, jokers: boolean) => void;
+  startMatch: (humanName: string, totalPlayers: number, icon: string, jokers: boolean, difficulty: BotDifficulty) => void;
   sendAction: (action: PlayerAction) => void;
   requestHint: () => void;
   newMatch: () => void;
@@ -67,7 +69,10 @@ export function useLocalGame(): UseLocalGame {
   const commentaryProvider = useRef(new TemplateCommentaryProvider());
   // Remembered so "Play again" (newMatch) can redeal immediately with the same settings
   // instead of dumping the player back at a blank setup screen.
-  const lastConfig = useRef<{ humanName: string; totalPlayers: number; icon: string; jokers: boolean } | null>(null);
+  const lastConfig = useRef<{ humanName: string; totalPlayers: number; icon: string; jokers: boolean; difficulty: BotDifficulty } | null>(
+    null,
+  );
+  const difficultyRef = useRef<BotDifficulty>(DEFAULT_DIFFICULTY);
   const submittedLeaderboard = useRef(false);
 
   const notifyEvents = useCallback(async (events: GameEvent[], forState: GameState) => {
@@ -86,7 +91,7 @@ export function useLocalGame(): UseLocalGame {
       let current = from;
       while (isBotTurn(current)) {
         await delay(BOT_THINK_MIN_MS + Math.random() * (BOT_THINK_MAX_MS - BOT_THINK_MIN_MS));
-        const { state: next, newEvents } = stepBot(current);
+        const { state: next, newEvents } = stepBot(current, difficultyRef.current);
         current = next;
         setState(current);
         await notifyEvents(newEvents, current);
@@ -97,8 +102,9 @@ export function useLocalGame(): UseLocalGame {
   );
 
   const startMatch = useCallback(
-    (humanName: string, totalPlayers: number, icon: string, jokers: boolean) => {
-      lastConfig.current = { humanName, totalPlayers, icon, jokers };
+    (humanName: string, totalPlayers: number, icon: string, jokers: boolean, difficulty: BotDifficulty) => {
+      lastConfig.current = { humanName, totalPlayers, icon, jokers, difficulty };
+      difficultyRef.current = difficulty;
       setMyIcon(icon);
       submittedLeaderboard.current = false;
       const count = Math.min(MAX_SEATS, Math.max(2, Math.floor(totalPlayers) || 3));
@@ -165,8 +171,8 @@ export function useLocalGame(): UseLocalGame {
 
   const newMatch = useCallback(() => {
     if (lastConfig.current) {
-      const { humanName, totalPlayers, icon, jokers } = lastConfig.current;
-      startMatch(humanName, totalPlayers, icon, jokers);
+      const { humanName, totalPlayers, icon, jokers, difficulty } = lastConfig.current;
+      startMatch(humanName, totalPlayers, icon, jokers, difficulty);
       return;
     }
     setState(null);

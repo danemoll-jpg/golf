@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { BotDifficulty } from '@golf/engine';
 import { unlockAudio } from '../lib/audio';
+import { DEFAULT_DIFFICULTY, DIFFICULTY_DESCRIPTIONS, DIFFICULTY_LABELS, DIFFICULTY_OPTIONS } from '../lib/difficulty';
 import { DEFAULT_PLAYER_ICON } from '../lib/icons';
 import { IconPicker } from './IconPicker';
 
 interface StartScreenProps {
   connected: boolean;
-  onStart: (humanName: string, totalPlayers: number, icon: string, jokers: boolean) => void;
+  onStart: (humanName: string, totalPlayers: number, icon: string, jokers: boolean, difficulty: BotDifficulty) => void;
   onBack: () => void;
 }
 
@@ -14,11 +16,12 @@ export function StartScreen({ connected, onStart, onBack }: StartScreenProps) {
   const [icon, setIcon] = useState(DEFAULT_PLAYER_ICON);
   const [totalPlayers, setTotalPlayers] = useState(3);
   const [jokers, setJokers] = useState(false);
+  const [difficulty, setDifficulty] = useState<BotDifficulty>(DEFAULT_DIFFICULTY);
 
   function handleStart() {
     // Browsers require a real user gesture before audio can play — this click is it.
     unlockAudio();
-    onStart(name, totalPlayers, icon, jokers);
+    onStart(name, totalPlayers, icon, jokers, difficulty);
   }
 
   return (
@@ -61,6 +64,18 @@ export function StartScreen({ connected, onStart, onBack }: StartScreenProps) {
           </div>
         </label>
 
+        <label className="start-screen__label">
+          Bot difficulty
+          <div className="start-screen__options">
+            {DIFFICULTY_OPTIONS.map((d) => (
+              <button key={d} type="button" className={difficulty === d ? 'active' : ''} onClick={() => setDifficulty(d)}>
+                {DIFFICULTY_LABELS[d]}
+              </button>
+            ))}
+          </div>
+          <span className="start-screen__hint">{DIFFICULTY_DESCRIPTIONS[difficulty]}</span>
+        </label>
+
         <label className="start-screen__checkbox">
           <input type="checkbox" checked={jokers} onChange={(e) => setJokers(e.target.checked)} />
           🃏 Play with Jokers (2 extra cards worth -5 each — a house-rule variant)
@@ -81,6 +96,7 @@ export function StartScreen({ connected, onStart, onBack }: StartScreenProps) {
             <li>Once your whole grid is face-up, everyone else gets exactly one more turn, then the hole is scored.</li>
             <li>9 holes, lowest total wins.</li>
             <li>Optional: turn on Jokers below for 2 extra cards worth -5 each — the best card in the deck.</li>
+            <li>Pick a bot difficulty below — Easy is forgiving, Hard card-counts and plays sharp.</li>
           </ul>
           <p>Stuck mid-turn? Hit the "What should I play?" button any time.</p>
         </details>

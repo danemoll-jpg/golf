@@ -22,6 +22,7 @@
 
 import { doc, onSnapshot, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
 import {
+  BotDifficulty,
   BotPersonalityId,
   CommentaryLine,
   createMatch,
@@ -30,6 +31,7 @@ import {
   MatchRules,
   TemplateCommentaryProvider,
 } from '@golf/engine';
+import { DEFAULT_DIFFICULTY } from '../lib/difficulty';
 import { db } from './firebase';
 import { getClientId } from './clientId';
 import { commentaryForEvents } from '../lib/commentary';
@@ -64,6 +66,10 @@ export interface RoomDoc {
   phase: 'lobby' | 'playing';
   seats: RoomSeat[];
   rules: MatchRules;
+  /** How well any bot seats play — a pure AI-tuning knob, not a rule of the game, so it
+   * lives here on the room doc rather than inside the engine's GameState/MatchRules. Only
+   * consulted by whichever browser is currently driving bot turns (see useOnlineRoom). */
+  botDifficulty: BotDifficulty;
   gameState: GameState | null;
   commentary: RoomCommentaryEntry[];
   nextCommentarySeq: number;
@@ -95,6 +101,7 @@ export async function createRoom(hostName: string, hostIcon: string): Promise<st
     phase: 'lobby',
     seats: [{ id: seatId(), name: hostName.trim() || 'Player 1', type: 'human', icon: hostIcon, clientId }],
     rules: DEFAULT_RULES,
+    botDifficulty: DEFAULT_DIFFICULTY,
     gameState: null,
     commentary: [],
     nextCommentarySeq: 0,
@@ -204,6 +211,11 @@ export async function startMatch(code: string, seats: RoomSeat[], rules: MatchRu
 /** Host-only: updates the house rules while still in the lobby (before dealing). */
 export async function setRoomRules(code: string, rules: MatchRules): Promise<void> {
   await updateDoc(roomRef(code), { rules });
+}
+
+/** Host-only: updates the bot difficulty while still in the lobby (before dealing). */
+export async function setRoomDifficulty(code: string, botDifficulty: BotDifficulty): Promise<void> {
+  await updateDoc(roomRef(code), { botDifficulty });
 }
 
 /** Writes a new game state (after a human or bot move) plus any commentary lines it

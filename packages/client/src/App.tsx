@@ -72,6 +72,7 @@ function OnlineGame({ onBack }: { onBack: () => void }) {
         onAddBotSeat={room.addBotSeat}
         onRemoveSeat={room.removeSeat}
         onSetJokersRule={room.setJokersRule}
+        onSetBotDifficulty={room.setBotDifficulty}
         onStart={room.begin}
         onLeave={() => {
           room.leaveRoom();

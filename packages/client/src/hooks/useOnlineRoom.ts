@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   applyAction,
+  BotDifficulty,
   BotPersonalityId,
   deriveSoundCues,
   DEFAULT_RULES,
@@ -14,6 +15,7 @@ import {
 } from '@golf/engine';
 import { isBotTurn, stepBot } from '../lib/bot';
 import { commentaryForEvents } from '../lib/commentary';
+import { DEFAULT_DIFFICULTY } from '../lib/difficulty';
 import { isMuted, playSound, setMuted, SoundName } from '../lib/audio';
 import { addScoresToGlobalLeaderboard } from '../network/globalLeaderboard';
 import { getClientId } from '../network/clientId';
@@ -26,6 +28,7 @@ import {
   removeSeat as removeSeatRequest,
   resetToLobby,
   RoomDoc,
+  setRoomDifficulty,
   setRoomRules,
   startMatch as startMatchRequest,
   subscribeToRoom,
@@ -70,6 +73,7 @@ export interface UseOnlineRoom {
   addBotSeat: () => void;
   removeSeat: (index: number) => void;
   setJokersRule: (jokers: boolean) => void;
+  setBotDifficulty: (difficulty: BotDifficulty) => void;
   begin: () => void;
   publicState: PublicGameState | null;
   /** Human players' chosen avatars, keyed by player id — see GameView's playerIcons prop. */
@@ -150,10 +154,11 @@ export function useOnlineRoom(): UseOnlineRoom {
 
     let current = gameState;
     let currentRoom = room;
+    const difficulty = room.botDifficulty ?? DEFAULT_DIFFICULTY;
     (async () => {
       while (isBotTurn(current)) {
         await delay(BOT_THINK_MIN_MS + Math.random() * (BOT_THINK_MAX_MS - BOT_THINK_MIN_MS));
-        const { state: next, newEvents } = stepBot(current);
+        const { state: next, newEvents } = stepBot(current, difficulty);
         const lines = await commentaryForEvents(commentaryProvider.current, newEvents, next);
         const written = await writeGameState(code, currentRoom, next, lines);
         current = next;
@@ -237,6 +242,13 @@ export function useOnlineRoom(): UseOnlineRoom {
   const setJokersRule = useCallback(
     (jokers: boolean) => {
       if (code) setRoomRules(code, { jokers }).catch((err) => setError(err instanceof Error ? err.message : 'Failed.'));
+    },
+    [code],
+  );
+
+  const setBotDifficulty = useCallback(
+    (difficulty: BotDifficulty) => {
+      if (code) setRoomDifficulty(code, difficulty).catch((err) => setError(err instanceof Error ? err.message : 'Failed.'));
     },
     [code],
   );
@@ -327,6 +339,7 @@ export function useOnlineRoom(): UseOnlineRoom {
     addBotSeat,
     removeSeat,
     setJokersRule,
+    setBotDifficulty,
     begin,
     publicState,
     playerIcons,

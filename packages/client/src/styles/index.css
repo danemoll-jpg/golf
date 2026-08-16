@@ -115,6 +115,11 @@ button {
   color: var(--felt-dark);
 }
 
+.start-screen__options button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .start-screen__checkbox {
   display: flex;
   align-items: center;
@@ -127,6 +132,14 @@ button {
 .start-screen__checkbox input {
   width: 1.1rem;
   height: 1.1rem;
+}
+
+.start-screen__hint {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 400;
+  opacity: 0.8;
 }
 
 .start-screen__submit {

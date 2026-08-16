@@ -1,4 +1,6 @@
+import { BotDifficulty } from '@golf/engine';
 import { RoomDoc } from '../network/rooms';
+import { DEFAULT_DIFFICULTY, DIFFICULTY_DESCRIPTIONS, DIFFICULTY_LABELS, DIFFICULTY_OPTIONS } from '../lib/difficulty';
 import { MAX_SEATS, seatAvatar } from '../lib/players';
 import { unlockAudio } from '../lib/audio';
 
@@ -12,6 +14,7 @@ interface LobbyScreenProps {
   onAddBotSeat: () => void;
   onRemoveSeat: (index: number) => void;
   onSetJokersRule: (jokers: boolean) => void;
+  onSetBotDifficulty: (difficulty: BotDifficulty) => void;
   onStart: () => void;
   onLeave: () => void;
 }
@@ -26,6 +29,7 @@ export function LobbyScreen({
   onAddBotSeat,
   onRemoveSeat,
   onSetJokersRule,
+  onSetBotDifficulty,
   onStart,
   onLeave,
 }: LobbyScreenProps) {
@@ -33,6 +37,8 @@ export function LobbyScreen({
   const canStart = isHost && room.seats.length >= 2 && !hasOpenSeat;
   const tableFull = room.seats.length >= MAX_SEATS;
   const jokersOn = room.rules?.jokers ?? false;
+  const hasBotSeat = room.seats.some((s) => s.type === 'bot');
+  const difficulty = room.botDifficulty ?? DEFAULT_DIFFICULTY;
 
   function handleStart() {
     unlockAudio();
@@ -76,6 +82,26 @@ export function LobbyScreen({
               + Add a bot
             </button>
           </div>
+        )}
+
+        {hasBotSeat && (
+          <label className="start-screen__label">
+            Bot difficulty
+            <div className="start-screen__options">
+              {DIFFICULTY_OPTIONS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={difficulty === d ? 'active' : ''}
+                  disabled={!isHost}
+                  onClick={() => onSetBotDifficulty(d)}
+                >
+                  {DIFFICULTY_LABELS[d]}
+                </button>
+              ))}
+            </div>
+            <span className="start-screen__hint">{DIFFICULTY_DESCRIPTIONS[difficulty]}</span>
+          </label>
         )}
 
         <label className="start-screen__checkbox">
