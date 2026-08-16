@@ -21,9 +21,18 @@
 // next claims the first one they find.
 
 import { doc, onSnapshot, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
-import { BotPersonalityId, CommentaryLine, createMatch, DEFAULT_RULES, GameState, MatchRules } from '@golf/engine';
+import {
+  BotPersonalityId,
+  CommentaryLine,
+  createMatch,
+  DEFAULT_RULES,
+  GameState,
+  MatchRules,
+  TemplateCommentaryProvider,
+} from '@golf/engine';
 import { db } from './firebase';
 import { getClientId } from './clientId';
+import { commentaryForEvents } from '../lib/commentary';
 import { buildPlayerConfigs, MAX_SEATS, nextBotPersonality } from '../lib/players';
 
 const COMMENTARY_LIMIT = 30;
@@ -178,7 +187,18 @@ export async function startMatch(code: string, seats: RoomSeat[], rules: MatchRu
     seats.map((s) => ({ id: s.id, name: s.name, isBot: s.type === 'bot', personality: s.personality })),
   );
   const gameState = createMatch({ playerConfigs, rules });
-  await updateDoc(roomRef(code), { phase: 'playing', gameState });
+
+  // Generate commentary for hole 1's opening events (matchStarted, holeStarted) right here —
+  // local play does this via notifyEvents immediately after createMatch (see
+  // useLocalGame.ts's startMatch); online play needs the same thing so the room doc carries
+  // an opening line from its very first write, instead of staying silent until whatever
+  // happens to be the first commentary-worthy move later in the match. A fresh provider is
+  // fine — there's no prior-line dedup history worth carrying into a brand new match.
+  const commentary = (await commentaryForEvents(new TemplateCommentaryProvider(), gameState.log, gameState)).map(
+    (line, i) => ({ ...line, seq: i }),
+  );
+
+  await updateDoc(roomRef(code), { phase: 'playing', gameState, commentary, nextCommentarySeq: commentary.length });
 }
 
 /** Host-only: updates the house rules while still in the lobby (before dealing). */
