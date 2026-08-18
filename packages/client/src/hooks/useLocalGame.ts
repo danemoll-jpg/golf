@@ -136,7 +136,9 @@ export function useLocalGame(): UseLocalGame {
     (action: PlayerAction) => {
       if (!state) return;
       const seatIndex = state.players.findIndex((p) => p.id === HUMAN_ID);
-      if (state.actingSeat !== seatIndex) {
+      // 'readyForNextHole' isn't turn-based — it's legal any time the hole-over screen is up,
+      // regardless of whose turn it was when the hole ended.
+      if (action.type !== 'readyForNextHole' && state.actingSeat !== seatIndex) {
         setError("It's not your turn.");
         return;
       }

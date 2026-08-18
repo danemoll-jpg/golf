@@ -940,3 +940,65 @@ button {
   font-size: 1.1rem;
   font-weight: 700;
 }
+
+/* ---------- Hole summary (between-holes pause) ---------- */
+
+.hole-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 1rem 0;
+  text-align: left;
+}
+
+.hole-summary-row {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(230, 183, 63, 0.25);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.8rem;
+}
+
+.hole-summary-row--best {
+  border-color: var(--gold);
+  background: rgba(230, 183, 63, 0.12);
+}
+
+.hole-summary-row__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.hole-summary-row__name {
+  font-weight: 700;
+}
+
+.hole-summary-row__score {
+  font-weight: 700;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+.hole-summary-row__total {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.hole-summary-row__layout {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.hole-summary-row__column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.hole-summary__waiting {
+  margin-top: 1.25rem;
+  opacity: 0.85;
+  font-style: italic;
+}

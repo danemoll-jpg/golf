@@ -109,7 +109,20 @@ export interface PendingDraw {
   card: Card;
 }
 
-export type GamePhase = 'revealing' | 'playing' | 'finalTurns' | 'matchOver';
+export type GamePhase = 'revealing' | 'playing' | 'finalTurns' | 'holeOver' | 'matchOver';
+
+/** Snapshot taken the instant a hole ends, before the next hole's `dealHole` overwrites
+ * everyone's layout — this is what the hole-summary screen renders while play is paused
+ * waiting for humans to ready up (see `readyPlayerIds`). `layout` is each player's final
+ * layout for the hole (every slot face-up by the time a hole is scored), safe to show in full
+ * since the hole it belonged to is already over. */
+export interface HoleSummary {
+  holeNumber: number;
+  /** True for hole 9 — the summary screen's "continue" button leads to the match-over screen
+   * instead of another hole. */
+  isFinalHole: boolean;
+  players: Array<{ playerId: string; layout: LayoutSlot[]; holeScore: number; total: number }>;
+}
 
 /** Structured events emitted by the engine as it plays — the seam commentary/sound cues
  * hook into. */
@@ -122,6 +135,7 @@ export type GameEvent =
   | { type: 'discardedDrawn'; by: string }
   | { type: 'layoutComplete'; by: string }
   | { type: 'holeScored'; holeNumber: number; scores: Array<{ playerId: string; score: number; total: number }> }
+  | { type: 'playerReady'; by: string }
   | { type: 'matchOver'; winnerIds: string[]; isDraw: boolean };
 
 /** Optional house rules, fixed for the whole match (chosen at setup, before hole 1 is
@@ -160,6 +174,13 @@ export interface GameState {
   log: GameEvent[];
   /** Set once phase is 'matchOver' — lowest total wins; more than one id means a tie. */
   matchWinnerIds: string[] | null;
+  /** Populated only while `phase === 'holeOver'` — cleared again once play resumes (either
+   * the next hole is dealt or the match ends). */
+  holeSummary: HoleSummary | null;
+  /** Player ids who've clicked "next hole" during the current hole-over pause. Bot seats are
+   * added automatically the moment the hole ends — they never make anyone wait — so this only
+   * ever gates on human players. Reset each time a new hole-over pause begins. */
+  readyPlayerIds: string[];
 }
 
 export interface EngineConfig {
@@ -175,8 +196,17 @@ export type DrawStockAction = { type: 'drawStock' };
 export type DrawDiscardAction = { type: 'drawDiscard' };
 export type SwapAction = { type: 'swap'; slotIndex: number };
 export type DiscardDrawnAction = { type: 'discardDrawn' };
+/** Sent by a human player from the hole-over summary screen. Legal only for that player's own
+ * seat, only while `phase === 'holeOver'`, and only once (see rules.ts). */
+export type ReadyForNextHoleAction = { type: 'readyForNextHole' };
 
-export type PlayerAction = RevealAction | DrawStockAction | DrawDiscardAction | SwapAction | DiscardDrawnAction;
+export type PlayerAction =
+  | RevealAction
+  | DrawStockAction
+  | DrawDiscardAction
+  | SwapAction
+  | DiscardDrawnAction
+  | ReadyForNextHoleAction;
 
 export interface LegalActions {
   seatIndex: number;

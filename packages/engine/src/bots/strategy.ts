@@ -172,6 +172,11 @@ export function scoreActions(state: GameState, seatIndex: number): ScoredAction[
       return { action, score: badEnoughToDecline ? (urgent ? 45 : 80) : 5, reason: 'declineBadDraw' };
     }
 
+    if (action.type === 'readyForNextHole') {
+      // The only legal action during the hole-over pause — nothing to rank it against.
+      return { action, score: 0, reason: 'onlyOption' };
+    }
+
     // swap
     const card = state.pendingDraw!.card;
     const slotIndex = action.slotIndex;

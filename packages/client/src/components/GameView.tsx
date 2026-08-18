@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 import { MoveHint, PlayerAction, PublicGameState } from '@golf/engine';
 import { CommentaryFeed } from './CommentaryFeed';
 import { HintPanel } from './HintPanel';
+import { HoleSummaryScreen } from './HoleSummaryScreen';
 import { HowToPlay } from './HowToPlay';
 import { LeaderboardPanel } from './LeaderboardPanel';
 import { MatchOverScreen } from './MatchOverScreen';
@@ -165,6 +166,13 @@ export function GameView({
       )}
       {showLeaderboard && <LeaderboardPanel onClose={() => setShowLeaderboard(false)} />}
       {showHowToPlay && <HowToPlay onClose={() => setShowHowToPlay(false)} jokersInThisMatch={publicState.rules.jokers} />}
+      {publicState.phase === 'holeOver' && publicState.holeSummary && (
+        <HoleSummaryScreen
+          key={publicState.holeSummary.holeNumber}
+          state={publicState}
+          onReady={() => sendAction({ type: 'readyForNextHole' })}
+        />
+      )}
       {publicState.phase === 'matchOver' && <MatchOverScreen state={publicState} onPlayAgain={newMatch} />}
     </div>
   );

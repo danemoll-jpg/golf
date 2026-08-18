@@ -42,6 +42,13 @@ export function nextTurnSeat(state: GameState): number {
 
 /** Computes the legal actions for whichever seat is currently allowed to act. */
 export function getLegalActions(state: GameState, seatIndex: number): PlayerAction[] {
+  if (state.phase === 'holeOver') {
+    // Not turn-based — every human player independently has a legal "ready" action (once)
+    // regardless of whose turn it was when the hole ended.
+    const player = state.players[seatIndex];
+    if (!player || player.isBot || state.readyPlayerIds.includes(player.id)) return [];
+    return [{ type: 'readyForNextHole' }];
+  }
   if (state.phase === 'matchOver' || state.actingSeat !== seatIndex) return [];
   const player = state.players[seatIndex];
 
