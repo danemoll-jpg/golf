@@ -8,7 +8,10 @@ export interface BotStepResult {
 }
 
 export function isBotTurn(state: GameState): boolean {
-  return state.phase !== 'matchOver' && state.players[state.actingSeat]?.isBot === true;
+  // 'holeOver' isn't turn-based — nobody "acts" there, humans just ready up in any order — so
+  // `actingSeat` (a leftover from whoever played last) doesn't mean anything and must not be
+  // read as "it's this bot's turn."
+  return state.phase !== 'matchOver' && state.phase !== 'holeOver' && state.players[state.actingSeat]?.isBot === true;
 }
 
 /** Applies exactly one bot decision using the shared heuristic strategy at the given

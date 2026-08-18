@@ -19,6 +19,8 @@ function describeAction(action: PlayerAction): string {
       return `Play it into slot ${action.slotIndex + 1}`;
     case 'discardDrawn':
       return "Discard it — don't use it";
+    case 'readyForNextHole':
+      return 'Ready up for the next hole';
   }
 }
 

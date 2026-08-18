@@ -5,6 +5,7 @@ import {
   createMatch,
   EngineConfig,
   getCurrentLegalActions,
+  getLegalActions,
   GameState,
   HOLES_PER_MATCH,
 } from '../src/index.js';
@@ -111,6 +112,114 @@ describe('full simulated matches', () => {
       });
     }
   }
+});
+
+/** Drives `state` with the shared bot heuristic (regardless of a seat's isBot flag — the
+ * heuristic doesn't care) until the hole in progress ends, i.e. until the engine parks in
+ * 'holeOver'. Used by the readiness-gate tests below, which need a human seat in the mix. */
+function driveUntilHoleOver(state: GameState, rng: () => number): GameState {
+  let current = state;
+  let steps = 0;
+  while (current.phase !== 'holeOver' && current.phase !== 'matchOver' && steps < 20000) {
+    const legal = getCurrentLegalActions(current)!;
+    const decision = chooseBestAction(current, legal.seatIndex)!;
+    current = applyAction(current, legal.seatIndex, decision.action, rng);
+    steps += 1;
+  }
+  return current;
+}
+
+describe('hole-over readiness gate', () => {
+  it('pauses in holeOver with a summary, auto-readying bots but not the human', () => {
+    const rng = seededRng(3);
+    const playerConfigs: EngineConfig['playerConfigs'] = [
+      { id: 'human', name: 'Human', isBot: false },
+      { id: 'bot0', name: 'Bot', isBot: true },
+    ];
+    const state = driveUntilHoleOver(createMatch({ playerConfigs, rng }), rng);
+
+    expect(state.phase).toBe('holeOver');
+    expect(getCurrentLegalActions(state)).toBeNull();
+    expect(state.holeSummary).not.toBeNull();
+    expect(state.holeSummary!.holeNumber).toBe(1);
+    expect(state.holeSummary!.isFinalHole).toBe(false);
+    expect(state.holeSummary!.players.map((p) => p.playerId).sort()).toEqual(['bot0', 'human']);
+    expect(state.readyPlayerIds).toEqual(['bot0']);
+    for (const p of state.holeSummary!.players) {
+      expect(p.layout.every((slot) => slot.faceUp)).toBe(true);
+    }
+
+    const botSeat = state.players.findIndex((p) => p.id === 'bot0');
+    const humanSeat = state.players.findIndex((p) => p.id === 'human');
+    expect(getLegalActions(state, botSeat)).toEqual([]);
+    expect(getLegalActions(state, humanSeat)).toEqual([{ type: 'readyForNextHole' }]);
+  });
+
+  it('deals hole 2 only once the human readies up', () => {
+    const rng = seededRng(3);
+    const playerConfigs: EngineConfig['playerConfigs'] = [
+      { id: 'human', name: 'Human', isBot: false },
+      { id: 'bot0', name: 'Bot', isBot: true },
+    ];
+    const holeOver = driveUntilHoleOver(createMatch({ playerConfigs, rng }), rng);
+    const humanSeat = holeOver.players.findIndex((p) => p.id === 'human');
+
+    const next = applyAction(holeOver, humanSeat, { type: 'readyForNextHole' }, rng);
+    expect(next.phase).toBe('revealing');
+    expect(next.holeNumber).toBe(2);
+    expect(next.holeSummary).toBeNull();
+    expect(next.readyPlayerIds).toEqual([]);
+    for (const p of next.players) expect(p.holeScores).toHaveLength(1);
+  });
+
+  it('rejects a bot seat sending readyForNextHole, and rejects a repeat from the same human', () => {
+    const rng = seededRng(3);
+    const playerConfigs: EngineConfig['playerConfigs'] = [
+      { id: 'human1', name: 'Human 1', isBot: false },
+      { id: 'human2', name: 'Human 2', isBot: false },
+      { id: 'bot0', name: 'Bot', isBot: true },
+    ];
+    const holeOver = driveUntilHoleOver(createMatch({ playerConfigs, rng }), rng);
+    expect(holeOver.phase).toBe('holeOver');
+
+    const botSeat = holeOver.players.findIndex((p) => p.id === 'bot0');
+    expect(() => applyAction(holeOver, botSeat, { type: 'readyForNextHole' }, rng)).toThrow();
+
+    const human1Seat = holeOver.players.findIndex((p) => p.id === 'human1');
+    const afterFirstReady = applyAction(holeOver, human1Seat, { type: 'readyForNextHole' }, rng);
+    // Still waiting on human2 — the hole hasn't advanced yet.
+    expect(afterFirstReady.phase).toBe('holeOver');
+    expect(afterFirstReady.readyPlayerIds.sort()).toEqual(['bot0', 'human1']);
+    expect(() => applyAction(afterFirstReady, human1Seat, { type: 'readyForNextHole' }, rng)).toThrow();
+
+    const human2Seat = afterFirstReady.players.findIndex((p) => p.id === 'human2');
+    const afterSecondReady = applyAction(afterFirstReady, human2Seat, { type: 'readyForNextHole' }, rng);
+    expect(afterSecondReady.phase).toBe('revealing');
+    expect(afterSecondReady.holeNumber).toBe(2);
+  });
+
+  it('gates the transition into matchOver behind the same readiness check on the final hole', () => {
+    const rng = seededRng(5);
+    const playerConfigs: EngineConfig['playerConfigs'] = [
+      { id: 'human', name: 'Human', isBot: false },
+      { id: 'bot0', name: 'Bot', isBot: true },
+    ];
+    let state = createMatch({ playerConfigs, rng });
+    const humanSeat = state.players.findIndex((p) => p.id === 'human');
+
+    for (let hole = 1; hole <= HOLES_PER_MATCH; hole++) {
+      state = driveUntilHoleOver(state, rng);
+      expect(state.phase).toBe('holeOver');
+      expect(state.holeSummary!.isFinalHole).toBe(hole === HOLES_PER_MATCH);
+      // Even on the last hole, the match doesn't end until the human readies up.
+      expect(state.matchWinnerIds).toBeNull();
+      state = applyAction(state, humanSeat, { type: 'readyForNextHole' }, rng);
+    }
+
+    expect(state.phase).toBe('matchOver');
+    expect(state.matchWinnerIds).not.toBeNull();
+    for (const p of state.players) expect(p.holeScores).toHaveLength(HOLES_PER_MATCH);
+  });
 });
 
 describe('Jokers house rule', () => {

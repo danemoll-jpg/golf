@@ -8,6 +8,7 @@ import {
   EngineConfig,
   GameState,
   HOLES_PER_MATCH,
+  HoleSummary,
   LAYOUT_COLUMNS,
   LAYOUT_SIZE,
   LegalActions,
@@ -68,6 +69,8 @@ export function createMatch(config: EngineConfig): GameState {
     finalTurnsRemaining: 0,
     log: [],
     matchWinnerIds: null,
+    holeSummary: null,
+    readyPlayerIds: [],
   };
 
   state.log.push({ type: 'matchStarted', playerOrder: players.map((p) => p.id) });
@@ -76,7 +79,7 @@ export function createMatch(config: EngineConfig): GameState {
 }
 
 export function getCurrentLegalActions(state: GameState): LegalActions | null {
-  if (state.phase === 'matchOver') return null;
+  if (state.phase === 'matchOver' || state.phase === 'holeOver') return null;
   return { seatIndex: state.actingSeat, actions: getLegalActions(state, state.actingSeat) };
 }
 
@@ -118,19 +121,49 @@ function checkLayoutCompleteAndAdvance(state: GameState, seatIndex: number, rng:
   endTurn(state, rng);
 }
 
+/** Scores the just-finished hole and parks the match in 'holeOver' with a snapshot for the
+ * summary screen — nothing is dealt and the match is never marked over from here directly.
+ * Bot seats are auto-readied immediately (they never make anyone wait); if that alone clears
+ * every human (an all-bot table, or no humans left), the hole-over pause collapses instantly
+ * via `maybeAdvanceFromHoleOver` and this behaves just like the old immediate-advance code. */
 function resolveHole(state: GameState, rng: () => number): void {
   const scores: Array<{ playerId: string; score: number; total: number }> = [];
+  const summaryPlayers: HoleSummary['players'] = [];
   for (const p of state.players) {
     // Whatever's still face-down gets turned over for scoring — everyone sees the full
     // layout at the end of a hole, same as cards being flipped for a real showdown.
     for (const slot of p.layout) slot.faceUp = true;
     const score = scoreLayout(p.layout);
     p.holeScores.push(score);
-    scores.push({ playerId: p.id, score, total: p.holeScores.reduce((a, b) => a + b, 0) });
+    const total = p.holeScores.reduce((a, b) => a + b, 0);
+    scores.push({ playerId: p.id, score, total });
+    summaryPlayers.push({ playerId: p.id, layout: p.layout.map((slot) => ({ ...slot })), holeScore: score, total });
   }
   state.log.push({ type: 'holeScored', holeNumber: state.holeNumber, scores });
 
-  if (state.holeNumber >= HOLES_PER_MATCH) {
+  state.phase = 'holeOver';
+  state.holeSummary = {
+    holeNumber: state.holeNumber,
+    isFinalHole: state.holeNumber >= HOLES_PER_MATCH,
+    players: summaryPlayers,
+  };
+  state.readyPlayerIds = state.players.filter((p) => p.isBot).map((p) => p.id);
+  maybeAdvanceFromHoleOver(state, rng);
+}
+
+/** Once every human player has readied up (or there were none to begin with), either deals
+ * the next hole or, if this was the last one, ends the match. A no-op while any human is
+ * still on the hole-over summary screen. */
+function maybeAdvanceFromHoleOver(state: GameState, rng: () => number): void {
+  if (state.phase !== 'holeOver') return;
+  const allHumansReady = state.players.filter((p) => !p.isBot).every((p) => state.readyPlayerIds.includes(p.id));
+  if (!allHumansReady) return;
+
+  const summary = state.holeSummary!;
+  state.holeSummary = null;
+  state.readyPlayerIds = [];
+
+  if (summary.isFinalHole) {
     const totals = state.players.map((p) => ({ id: p.id, total: p.holeScores.reduce((a, b) => a + b, 0) }));
     const lowest = Math.min(...totals.map((t) => t.total));
     const winnerIds = totals.filter((t) => t.total === lowest).map((t) => t.id);
@@ -140,7 +173,7 @@ function resolveHole(state: GameState, rng: () => number): void {
     return;
   }
 
-  dealHole(state, state.holeNumber + 1, nextSeat(state.players.length, state.startingSeat), rng);
+  dealHole(state, summary.holeNumber + 1, nextSeat(state.players.length, state.startingSeat), rng);
 }
 
 export function applyAction(
@@ -238,6 +271,13 @@ export function applyAction(
       } else {
         endTurn(next, rng);
       }
+      break;
+    }
+
+    case 'readyForNextHole': {
+      next.readyPlayerIds = [...next.readyPlayerIds, player.id];
+      next.log.push({ type: 'playerReady', by: player.id });
+      maybeAdvanceFromHoleOver(next, rng);
       break;
     }
   }

@@ -1,4 +1,4 @@
-import { BotPersonalityId, Card, GamePhase, GameState, MatchRules } from './types.js';
+import { BotPersonalityId, Card, GamePhase, GameState, HoleSummary, MatchRules } from './types.js';
 
 /** A layout slot as any viewer is allowed to see it — `card` is only populated once
  * `faceUp` is true. Unlike Durak's hand privacy (hidden from opponents, visible to the
@@ -38,6 +38,11 @@ export interface PublicGameState {
   finishedBy: string | null;
   finalTurnsRemaining: number;
   matchWinnerIds: string[] | null;
+  /** Populated only while `phase === 'holeOver'` — see HoleSummary. Safe to expose in full
+   * (including every player's final layout) since the hole it describes has already ended. */
+  holeSummary: HoleSummary | null;
+  /** Human player ids who've already readied up for the next hole, during 'holeOver'. */
+  readyPlayerIds: string[];
   /** Which seat this view was built for. -1 if the viewer isn't seated (spectator). */
   viewerSeatIndex: number;
 }
@@ -70,6 +75,8 @@ export function redactState(state: GameState, viewerId: string): PublicGameState
     finishedBy: state.finishedBy,
     finalTurnsRemaining: state.finalTurnsRemaining,
     matchWinnerIds: state.matchWinnerIds,
+    holeSummary: state.holeSummary,
+    readyPlayerIds: state.readyPlayerIds,
     viewerSeatIndex,
   };
 }
