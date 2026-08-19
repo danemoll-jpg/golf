@@ -62,9 +62,11 @@ export function HoleSummaryScreen({ state, onReady }: HoleSummaryScreenProps) {
         </div>
 
         {iAmHuman && !iAmReady && (
-          <button type="button" className="game-over__button" onClick={handleReady}>
-            {summary.isFinalHole ? 'See final results 🏆' : 'Next hole →'}
-          </button>
+          <div className="game-over__actions">
+            <button type="button" className="game-over__button" onClick={handleReady}>
+              {summary.isFinalHole ? 'See final results 🏆' : 'Next hole →'}
+            </button>
+          </div>
         )}
         {(!iAmHuman || iAmReady) && (
           <p className="hole-summary__waiting">
